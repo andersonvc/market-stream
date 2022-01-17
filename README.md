@@ -2,7 +2,7 @@
 
 This is a proof-of-concept for building a low-latency stream processing service on Raspberry-Pi with Docker. The project is deployed via docker-compose and builds a TimescaleDB record store, Grafana dashboard, and async websocket client that pulls market/crypto data from Alpaca. Feed latency is approximately 100ms, but could be massively improved with some simple code improvements.
 
-![Dashboard](https://raw.githubusercontent.com/andersonvc/market-stream/main/docs/grafana_snapshot2.png)
+![Dashboard](https://raw.githubusercontent.com/andersonvc/market-stream/master/docs/grafana_screenshot2.png)
 
 #### Deployment
 1) Replace the keys values in the secrets/*.env.placeholder files with your environment secrets/configs/tokens. The Alpaca API token will require you to set up a free account with Alpaca
