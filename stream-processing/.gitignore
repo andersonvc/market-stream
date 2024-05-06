@@ -1,0 +1,7 @@
+/build*
+/.vscode
+/cpm_modules
+.DS_Store
+.env
+dist/
+__pycache__/

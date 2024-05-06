@@ -1,2 +1,5 @@
 secrets/*.env
 alpaca_client/.venv/
+stream-processing/data/*
+stream-processing/data/quote_20240506.avro
+data-visualization/alpaca_client/dist

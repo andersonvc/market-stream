@@ -1,0 +1,30 @@
+{
+    "type": "record",
+    "name": "trade",
+    "namespace": "crypto",
+    "fields": [
+        {
+            "name": "timestamp",
+            "type": {
+                "type": "long",
+                "logicalType": "timestamp-micros"
+            }
+        },
+        {
+            "name": "id",
+            "type": "long"
+        },
+        {
+            "name": "symbol",
+            "type": "string"
+        },
+        {
+            "name": "price",
+            "type": "double"
+        },
+        {
+            "name": "size",
+            "type": "double"
+        }
+    ]
+}

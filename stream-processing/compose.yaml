@@ -1,0 +1,137 @@
+version: '3'
+services:
+  kafka-1:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-1
+    container_name: kafka-1
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      CLUSTER_ID: YK72Kb7uM0qmTrBexPL3Tg
+      
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka-1:29093,PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093
+  
+  kafka-2:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-2
+    container_name: kafka-2
+    depends_on:
+      - kafka-1
+    ports:
+      - "9093:9092"
+      - "9102:9101"
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 2
+      CLUSTER_ID: YK72Kb7uM0qmTrBexPL3Tg
+      
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka-2:29093,PLAINTEXT://kafka-2:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093
+  
+  kafka-3:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka-3
+    container_name: kafka-3
+    depends_on:
+      - kafka-1
+      - kafka-2
+    ports:
+      - "9094:9092"
+      - "9103:9101"
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 3
+      CLUSTER_ID: YK72Kb7uM0qmTrBexPL3Tg
+      
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://kafka-3:29093,PLAINTEXT://kafka-3:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:29093,2@kafka-2:29093,3@kafka-3:29093
+
+  init-kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: |
+      "
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoQuote --if-not-exists --replication-factor 1 partitions 1 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoTrade --if-not-exists --replication-factor 1 partitions 1 --create
+      kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --list
+      "
+  
+  schema-registry:
+    image: bitnami/schema-registry:7.2
+    hostname: schema-registry
+    container_name: schema-registry
+    ports:
+      - "8081:8081"
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    environment:
+      - SCHEMA_REGISTRY_KAFKA_BROKERS=PLAINTEXT://kafka-1:9092,PLAINTEXT://kafka-2:9092,PLAINTEXT://kafka-3:9092
+      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+      - SCHEMA_REGISTRY_DEBUG=true
+    
+  init-schema:
+    build:
+      context: ./avro-store
+      dockerfile: Dockerfile
+    depends_on:
+      - schema-registry
+      - kafka-1
+      - init-kafka
+    volumes:
+      - ./avro-store:/avro-store
+    entrypoint: [ "/bin/sh", "/avro-store/setup.sh" ]
+    
+  alpaca-crypto-producer:
+    build: ./alpaca-crypto-client
+    hostname: alpaca-crypto-producer
+    container_name: alpaca-crypto-producer
+    environment:
+      - CLIENT_TYPE=producer
+    volumes:
+      - .env:/app/.env
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry
+    
+  alpaca-crypto-consumer:
+    build: ./alpaca-crypto-client
+    hostname: alpaca-crypto-consumer
+    container_name: alpaca-crypto-consumer
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry
+    volumes:
+      - ./data:/app/data
+    environment:
+      - CLIENT_TYPE=consumer
+    

@@ -1,0 +1,34 @@
+{
+    "type": "record",
+    "name": "quote",
+    "namespace": "crypto",
+    "fields": [
+        {
+            "name": "timestamp",
+            "type": {
+                "type": "long",
+                "logicalType": "timestamp-micros"
+            }
+        },
+        {
+            "name": "symbol",
+            "type": "string"
+        },
+        {
+            "name": "bid_price",
+            "type": "double"
+        },
+        {
+            "name": "bid_size",
+            "type": "double"
+        },
+        {
+            "name": "ask_price",
+            "type": "double"
+        },
+        {
+            "name": "ask_size",
+            "type": "double"
+        }
+    ]
+}

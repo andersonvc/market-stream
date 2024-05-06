@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "alpaca-crypto-client"
+version = "0.1.0"
+description = ""
+authors = ["andersonvc <ryan@anderson.vc>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+python-dotenv = "^1.0.1"
+alpaca-py = "^0.21.0"
+avro = "^1.11.3"
+confluent-kafka = "^2.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# add script
+[tool.poetry.scripts]
+start-producer = "alpaca_crypto_client.main:producer"
+start-consumer = "alpaca_crypto_client.main:consumer"
