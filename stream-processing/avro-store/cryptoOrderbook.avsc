@@ -1,0 +1,45 @@
+{
+    "type": "record",
+    "name": "orderbook",
+    "namespace": "crypto",
+    "fields": [
+        {
+            "name": "timestamp",
+            "type": {
+                "type": "long",
+                "logicalType": "timestamp-micros"
+            }
+        },
+        {
+            "name": "symbol",
+            "type": "string"
+        },
+        {
+            "name": "bids",
+            "type": {
+                "type": "array",
+                "items": {
+                        "name": "quote",
+                        "namespace": "crypto.bid",
+                        "type": "record",
+                        "fields": [
+                            {"name": "price", "type": "double"},
+                            {"name": "size", "type": "double"}
+                        ]
+                    }
+                }
+        },
+        {
+            "name": "asks",
+            "type": {
+                "type": "array",
+                "items": "crypto.bid.quote"
+                }
+        },
+
+        {
+            "name": "is_full",
+            "type": "boolean"
+        }
+    ]
+}

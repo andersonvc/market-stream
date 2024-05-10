@@ -20,3 +20,9 @@ export SCHEMA=$(cat /avro-store/cryptoTrade.avsc)
 echo '{"schemaType":"AVRO", "schema":""}' | jq --arg schema "$SCHEMA" '.schema = $schema' > $tmpfile
 curl --retry 10 -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
     --data @$tmpfile ${schemaregistry}/subjects/${topic}-value/versions
+
+topic=cryptoOrderbook
+export SCHEMA=$(cat /avro-store/cryptoOrderbook.avsc)
+echo '{"schemaType":"AVRO", "schema":""}' | jq --arg schema "$SCHEMA" '.schema = $schema' > $tmpfile
+curl --retry 10 -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+    --data @$tmpfile ${schemaregistry}/subjects/${topic}-value/versions
