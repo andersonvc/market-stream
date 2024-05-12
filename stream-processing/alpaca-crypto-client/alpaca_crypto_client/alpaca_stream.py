@@ -3,10 +3,10 @@ import logging
 from typing import Dict
 
 import msgpack
-import asyncio
 
 from alpaca.data.live.crypto import CryptoDataStream
 from alpaca.data.models import Orderbook
+
 
 class CustomOrderbook(Orderbook):
     """
@@ -24,7 +24,7 @@ class L2CryptoDataStream(CryptoDataStream):
         super().__init__(api_key=api_key, secret_key=secret_key)
         self._handlers['orderbooks'] = {}
         self._raw_data = raw_data
-    
+
 
     def subscribe_orderbook(self, handler, *symbols):
         self._subscribe(handler, symbols, self._handlers["orderbooks"])

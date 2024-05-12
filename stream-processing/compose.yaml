@@ -77,6 +77,7 @@ services:
       /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoQuote --if-not-exists --replication-factor 1 partitions 1 --create
       /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoTrade --if-not-exists --replication-factor 1 partitions 1 --create
       /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoOrderbook --if-not-exists --replication-factor 1 partitions 1 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic testOrderbook --if-not-exists --replication-factor 1 partitions 1 --create
       kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --list
       "
   
