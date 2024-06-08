@@ -1,4 +1,3 @@
-version: '3'
 services:
   kafka-1:
     image: confluentinc/cp-kafka:7.6.1
@@ -26,6 +25,7 @@ services:
     container_name: kafka-2
     depends_on:
       - kafka-1
+    #    condition: service_healthy
     ports:
       - "9093:9092"
       - "9102:9101"
@@ -74,12 +74,30 @@ services:
     entrypoint: [ "/bin/sh", "-c" ]
     command: |
       "
-      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoQuote --if-not-exists --replication-factor 1 partitions 1 --create
-      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoTrade --if-not-exists --replication-factor 1 partitions 1 --create
-      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoOrderbook --if-not-exists --replication-factor 1 partitions 1 --create
-      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic testOrderbook --if-not-exists --replication-factor 1 partitions 1 --create
-      kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --list
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoQuote --if-not-exists --replication-factor 1 partitions 1 --config cleanup.policy=delete --config delete.retention.ms=10800000 --config retention.ms=10800000 --config segment.ms=10800000 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoTrade --if-not-exists --replication-factor 1 partitions 1 --config cleanup.policy=delete --config delete.retention.ms=10800000 --config retention.ms=10800000 --config segment.ms=10800000 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic cryptoOrderbook --if-not-exists --replication-factor 1 partitions 1 --config cleanup.policy=delete --config delete.retention.ms=10800000 --config retention.ms=10800000 --config segment.ms=10800000 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic testOrderbook --if-not-exists --replication-factor 1 partitions 1 --config cleanup.policy=delete --config delete.retention.ms=10800000 --config retention.ms=10800000 --config segment.ms=10800000 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --topic orderbookChange --if-not-exists --replication-factor 1 partitions 1 --config cleanup.policy=delete --config delete.retention.ms=10800000 --config retention.ms=10800000 --config segment.ms=10800000 --create
+      /usr/bin/kafka-topics --bootstrap-server kafka-1:9092,kafka-2:9093,kafka-3:9094 --list
       "
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8080:8080
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry
+
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9093,kafka-3:9094
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8084
+
   
   schema-registry:
     image: bitnami/schema-registry:7.2
@@ -94,7 +112,7 @@ services:
     environment:
       - SCHEMA_REGISTRY_KAFKA_BROKERS=PLAINTEXT://kafka-1:9092,PLAINTEXT://kafka-2:9092,PLAINTEXT://kafka-3:9092
       - SCHEMA_REGISTRY_HOST_NAME=schema-registry
-      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8084
       - SCHEMA_REGISTRY_DEBUG=true
     
   init-schema:
@@ -115,6 +133,8 @@ services:
     container_name: alpaca-crypto-producer
     environment:
       - CLIENT_TYPE=producer
+      - KAFKA_BROKER_URL=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8084
     volumes:
       - .env:/app/.env
     depends_on:
@@ -123,17 +143,125 @@ services:
       - kafka-3
       - schema-registry
     
-  alpaca-crypto-consumer:
-    build: ./alpaca-crypto-client
-    hostname: alpaca-crypto-consumer
-    container_name: alpaca-crypto-consumer
+  #alpaca-crypto-consumer:
+  #  build: ./alpaca-crypto-client
+  #  hostname: alpaca-crypto-consumer
+  #  container_name: alpaca-crypto-consumer
+  #  depends_on:
+  #    - kafka-1
+  #    - kafka-2
+  #    - kafka-3
+  #    - schema-registry
+  #  volumes:
+  #    - ./data:/app/data
+  #  environment:
+  #    - CLIENT_TYPE=consumer
+  
+  #orderbook-replay:
+  #  build: ./alpaca-crypto-client
+  #  hostname: orderbook-replay
+  #  container_name: orderbook-replay
+  #  depends_on:
+  #    - kafka-1
+  #    - kafka-2
+  #    - kafka-3
+  #    - schema-registry
+  #    #- alpaca-crypto-producer
+  #    #- alpaca-crypto-consumer
+  #  volumes:
+  #    - ./data:/app/data
+  #  environment:
+  #    - CLIENT_TYPE=replay
+    
+  #orderbook-test:
+  #  build: ./alpaca-crypto-client
+  #  hostname: orderbook-test
+  #  container_name: orderbook-test
+  #  depends_on:
+  #    - kafka-1
+  #    - kafka-2
+  #    - kafka-3
+  #    - schema-registry
+  #    #- alpaca-crypto-producer
+  #    #- alpaca-crypto-consumer
+  # volumes:
+  #    - ./data:/app/data
+  #  environment:
+  #    - CLIENT_TYPE=test
+  
+  lob-aggregator:
+    build:
+      context: ./feature-generator
+      dockerfile: faust.Dockerfile
+    container_name: lob-aggregator
+    hostname: lob-aggregator
     depends_on:
       - kafka-1
       - kafka-2
       - kafka-3
       - schema-registry
     volumes:
-      - ./data:/app/data
-    environment:
-      - CLIENT_TYPE=consumer
-    
+      - ./feature-generator/app:/home/appuser/app
+    entrypoint: ['faust', '-A', 'app.main', 'worker', '-l', 'info']
+
+
+  #jobmanager:
+  #  build: 
+  #    context: ./pyflink-service
+  #    dockerfile: pyflink.Dockerfile
+  #  container_name: jobmanager
+  #  hostname: jobmanager
+  #  ports:
+  #    - "8085:8081"
+  #  command: jobmanager
+  #  depends_on:
+  #    - schema-registry
+  #    - orderbook-test
+  #    #- orderbook-replay
+  #  volumes:
+  #    - ./f5/src:/opt/flink/src
+  #  environment:
+  #    - |
+  #      FLINK_PROPERTIES=
+  #      jobmanager.rpc.address: jobmanager        
+
+  #taskmanager:
+  #  build: 
+  #    context: ./pyflink-service
+  #    dockerfile: pyflink.Dockerfile
+  #  container_name: taskmanager
+  #  hostname: taskmanager
+  #  depends_on:
+  #    - jobmanager
+  #  command: taskmanager
+  # scale: 1
+  #  environment:
+  #    - |
+  #      FLINK_PROPERTIES=
+  #      jobmanager.rpc.address: jobmanager
+  #      taskmanager.numberOfTaskSlots: 2       
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8.14-alpine
+    user: 101:101
+    container_name: clickhouse
+    hostname: clickhouse
+    volumes:
+      - ${PWD}/clickhouse/clickhouse/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ${PWD}/clickhouse/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+      - ${PWD}/clickhouse/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - ~/data/clickhouse:/var/lib/clickhouse
+    ports:
+      - 8123:8123
+      - 9000:9000
+    depends_on:
+      - clickhouse-keeper
+  clickhouse-keeper:
+    image: clickhouse/clickhouse-keeper:23.8.14-alpine
+    user: 101:101
+    container_name: clickhouse-keeper
+    hostname: clickhouse-keeper
+    volumes:
+      - ${PWD}/clickhouse/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    ports:
+      -  9181:9181

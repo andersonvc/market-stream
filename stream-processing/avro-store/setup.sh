@@ -1,5 +1,5 @@
 #!/bin/bash
-schemaregistry="http://schema-registry:8081"
+schemaregistry="http://schema-registry:8084"
 tmpfile=$(mktemp)
 
 echo "Waiting for Schema Registry to be ready"
@@ -23,6 +23,13 @@ curl --retry 10 -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json
 
 topic=cryptoOrderbook
 export SCHEMA=$(cat /avro-store/cryptoOrderbook.avsc)
+echo '{"schemaType":"AVRO", "schema":""}' | jq --arg schema "$SCHEMA" '.schema = $schema' > $tmpfile
+curl --retry 10 -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+    --data @$tmpfile ${schemaregistry}/subjects/${topic}-value/versions
+
+
+topic=orderbookChange
+export SCHEMA=$(cat /avro-store/orderbookChange.avsc)
 echo '{"schemaType":"AVRO", "schema":""}' | jq --arg schema "$SCHEMA" '.schema = $schema' > $tmpfile
 curl --retry 10 -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
     --data @$tmpfile ${schemaregistry}/subjects/${topic}-value/versions

@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "feature-generator"
+version = "0.1.0"
+description = ""
+authors = ["andersonvc <ryan@anderson.vc>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+confluent-kafka = "^2.4.0"
+faust-streaming = "^0.11.0"
+python-schema-registry-client = "^2.5.6"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
