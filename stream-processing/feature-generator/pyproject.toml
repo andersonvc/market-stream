@@ -10,6 +10,7 @@ python = "^3.11"
 confluent-kafka = "^2.4.0"
 faust-streaming = "^0.11.0"
 python-schema-registry-client = "^2.5.6"
+clickhouse-connect = "^0.7.11"
 
 [build-system]
 requires = ["poetry-core"]

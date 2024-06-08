@@ -1,13 +1,15 @@
-import faust
-from schema_registry.client import SchemaRegistryClient, schema
-from schema_registry.serializers.faust import FaustSerializer
-import fastavro
+import datetime
 import logging
-from yarl import URL
-import os
 import io
+import os
 import time
-from enum import Enum
+
+import clickhouse_connect
+import fastavro
+import faust
+from schema_registry.client import SchemaRegistryClient
+from yarl import URL
+
 
 while True:
     try:
@@ -27,8 +29,33 @@ while True:
         # Register kafka topics
         app = faust.App('lob-aggregator', broker=kafka_server_urls)
         crypto_orderbook_topic = app.topic(topic, value_serializer='raw')
+
+        # Register clickhouse connection
+        CLICKHOUSE_HOSTNAME = 'clickhouse'
+        CLICKHOUSE_PORT = 8123
+
+        logging.warning('connecting to clickhouse')
+        client = clickhouse_connect.get_client(
+            host=CLICKHOUSE_HOSTNAME,
+            port=CLICKHOUSE_PORT,
+            database='feature_store',
+        )
+        logging.warning('connection successful')
+
+        client.command('CREATE TABLE IF NOT EXISTS new_table (key UInt32, value String, metric Float64) ENGINE MergeTree ORDER BY key')
+
+        logging.warning('inserting data')
+
+        row1 = [1000, 'String Value 1000', 5.233]
+        row2 = [2000, 'String Value 2000', -107.04]
+        data = [row1, row2]
+        client.insert('new_table', data, column_names=['key', 'value', 'metric'])
+        logging.warning('inserted data')
+
+
         break
-    except:
+    except Exception as e:
+        logging.warning(f'Error: {e}')
         time.sleep(10)
         continue
 
@@ -37,6 +64,7 @@ class OrderbookAggregator:
     def __init__(self):
         self.live_orderbook_bids = {}
         self.live_orderbook_asks = {}
+        self.symbol = ''
         self.init_state = 'unset'
     
     def handle_initialization(self, data):
@@ -46,6 +74,7 @@ class OrderbookAggregator:
 
         # Only start populating data when a full orderbook message is passed
         if self.init_state=='unset':
+            self.symbol = data['symbol']
             self.live_orderbook_asks = {}
             self.live_orderbook_bids = {}
             if data.get('is_full'):
@@ -85,16 +114,17 @@ class OrderbookAggregator:
         if not self.is_updateable():
             return
 
-        logging.warning('updating')
         for quote in data.get('bids',[]):
             if quote['size'] <= 1e-5:
                 self.live_orderbook_bids.pop(quote['price'], None)
-            self.live_orderbook_bids[quote['price']] = quote['size']
+            else:
+                self.live_orderbook_bids[quote['price']] = quote['size']
         
         for quote in data.get('asks',[]):
             if quote['size'] <= 1e-5:
                 self.live_orderbook_asks.pop(quote['price'], None)
-            self.live_orderbook_asks[quote['price']] = quote['size']
+            else:
+                self.live_orderbook_asks[quote['price']] = quote['size']
 
     def get_orderbook(self):
         if not self.is_publishable():
@@ -110,7 +140,7 @@ class OrderbookAggregator:
         rec['highest_bid'] = sorted_bids[0][0]
         rec['lowest_ask'] = sorted_asks[0][0]
 
-        for label,val in {'1pct':0.01,'3pct':0.03,'5pct':0.05,'10pct':0.1}.items():
+        for label,val in {'1pct':0.01,'3pct':0.03,'5pct':0.05,'10pct':0.1,'15pct':0.15,'20pct':0.2,'30pct':0.3}.items():
             lower_thresh = rec['midpoint']-val*rec['midpoint']
             upper_thresh = rec['midpoint']+val*rec['midpoint']
             bid_vol,ask_vol = 0.,0.
@@ -126,15 +156,29 @@ class OrderbookAggregator:
             rec[f'bid_vol_{label}'] = bid_vol
             rec[f'ask_vol_{label}'] = ask_vol
             rec[f'imbalance_{label}'] = 0.0 if ask_vol==0 else ask_vol / bid_vol
-            
+        
+        rec['ts'] = datetime.datetime.now()
+        rec['symbol'] = self.symbol
+
+        columns = [
+            'symbol','ts','spread','midpoint','highest_bid','lowest_ask',
+            'bid_vol_1pct','ask_vol_1pct','imbalance_1pct',
+            'bid_vol_3pct','ask_vol_3pct','imbalance_3pct',
+            'bid_vol_5pct','ask_vol_5pct','imbalance_5pct',
+            'bid_vol_10pct','ask_vol_10pct','imbalance_10pct',
+            'bid_vol_15pct','ask_vol_15pct','imbalance_15pct',
+            'bid_vol_20pct','ask_vol_20pct','imbalance_20pct',
+            'bid_vol_30pct','ask_vol_30pct','imbalance_30pct'
+        ]
+        client.insert('orderbook', [[rec[v] for v in columns]], column_names=columns)
+        logging.warning('inserted orderbook data')
+
         logging.warning('Snapshot:')
         for key,value in rec.items():
             logging.warning(f'\t{key}: {value}')
         logging.warning('\n')
 
 orderbook = OrderbookAggregator()
-
-
 
 @app.agent(crypto_orderbook_topic)
 async def orderbook_stream(stream):
@@ -145,7 +189,6 @@ async def orderbook_stream(stream):
 @app.timer(interval=10)
 async def print_orderbook():
     orderbook.get_orderbook()
-
 
 
 if __name__ == '__main__':

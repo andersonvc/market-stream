@@ -76,12 +76,13 @@ class KafkaProducerClient:
         while retry_cnt := 0 < max_retry_attempts:
             try:
                 schema = self.schema_registry.get_latest_schema(avro_schema_name)[1]
+                assert schema, f"Empty schema: {avro_schema_name} (retrying)" 
                 self.schema_map[avro_schema_name] = schema
-                break
-            except:
+                return
+            except Exception as e:
                 retry_cnt += 1
                 logging.error(
-                    f"Failed to register schema: {avro_schema_name}. Retrying {retry_cnt} of {max_retry_attempts}"
+                    f"Failed to register schema: {avro_schema_name}. Retrying {retry_cnt} of {max_retry_attempts}\n{e}"
                 )
                 time.sleep(5 + 3**retry_cnt)
         if not self.schema_map.get(avro_schema_name):
@@ -116,9 +117,10 @@ class KafkaProducerClient:
         config = {**default_config, **(config or {})}
 
         # Load schema; grab from schema_registry if not already loaded
-        if avro_schema_name not in self.schema_map and avro_schema_name:
+        if avro_schema_name or not self.schema_map.get(avro_schema_name, None):
             self._configure_schema(avro_schema_name)
         avro_schema = self.schema_map.get(avro_schema_name)
+
 
         handler = functools.partial(
             self._publish_message_to_kafka,
